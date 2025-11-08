@@ -8,5 +8,11 @@ namespace SignalRApp
         {
             await this.Clients.All.SendAsync("Receive", user, message);
         }
+
+        // Приватное сообщение по ConnectionId
+        public async Task SendPrivateMessage(string targetConnectionId, string user, string message)
+        {
+            await Clients.Client(targetConnectionId).SendAsync("Receive", user, message);
+        }
     }
 }
