@@ -6,7 +6,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace SignalRApp.Models
 {
     [Table("messages")]
-    public class MessageModel : INotifyPropertyChanged
+    public class MessageModel
     {
         [Key]
         [Column("ID")]
@@ -14,6 +14,8 @@ namespace SignalRApp.Models
 
         [Column("ChatId")]
         public int ChatId { get; set; }
+        [Column("SenderId")]
+        public int SenderId { get; set; }
 
         [Column("MessageText")]
         public string MessageText { get; set; } = null!;
@@ -24,9 +26,8 @@ namespace SignalRApp.Models
         // Навигационное свойство
         [ForeignKey("ChatId")]
         public ChatModel Chat { get; set; } = null!;
+        [ForeignKey("SenderId")]
+        public UserModel Sender { get; set; } = null!;
 
-        public event PropertyChangedEventHandler PropertyChanged;
-        public void OnPropertyChanged(string prop = "")
-            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
     }
 }

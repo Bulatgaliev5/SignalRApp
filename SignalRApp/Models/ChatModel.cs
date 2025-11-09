@@ -6,29 +6,26 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace SignalRApp.Models
 {
     [Table("chats")]
-    public class ChatModel : INotifyPropertyChanged
+    public class ChatModel
     {
         [Key]
         [Column("Id")]
         public int Id { get; set; }
 
-        [Column("SenderId")]
-        public int SenderId { get; set; }
+        [Column("User1Id")]
+        public int User1Id { get; set; }
 
-        [Column("RecipientId")]
-        public int RecipientId { get; set; }
+        [Column("User2Id")]
+        public int User2Id { get; set; }
+
 
         // Навигационные свойства
-        [ForeignKey("SenderId")]
-        public UserModel Sender { get; set; } = null!;
-
-        [ForeignKey("RecipientId")]
-        public UserModel Recipient { get; set; } = null!;
-
+        [ForeignKey("User1Id")]
+        public UserModel User1 { get; set; } = null!;
+        [ForeignKey("User2Id")]
+        public UserModel User2 { get; set; } = null!;
+        [InverseProperty("Chat")]
         public ICollection<MessageModel> Messages { get; set; } = new List<MessageModel>();
 
-        public event PropertyChangedEventHandler PropertyChanged;
-        public void OnPropertyChanged(string prop = "")
-            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
     }
 }

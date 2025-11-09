@@ -9,14 +9,6 @@ namespace SignalRApp
 
     public class ChatHub: Hub
     {
-        // Демо база пользователей (логин → пароль)
-        //private static readonly Dictionary<string, string> demoUsers = new()
-        //{
-        //    { "admin", "12345" },
-        //    { "user", "qwerty" },
-        //    { "test", "test" }
-        //};
-
         private readonly DataBaze _context;
         public ChatHub(DataBaze context)
         {
@@ -26,16 +18,9 @@ namespace SignalRApp
         {
             // Пример: поиск пользователя в БД
             var user = _context.Users.FirstOrDefault(u => u.Login == login && u.Pass == password);
-           
-           // var message = _context.Message.FirstOrDefault();
-
-           // var chat = _context.ChartUser.FirstOrDefault();
 
             if (user != null)
             {
-                // Можно запомнить ConnectionId
-                // Например: user.ConnectionId = Context.ConnectionId;
-                // await _context.SaveChangesAsyncБ();
                 return true;
             }
 
@@ -51,38 +36,40 @@ namespace SignalRApp
             if (currentUser == null)
                 return new List<ChatUserModel>();
 
-            // Получаем все чаты, где он — либо отправитель, либо получатель
+            int currentUserId = currentUser.IdUser;
+
+            // Получаем все чаты, где участвует пользователь
             var chats = await _context.Chats
-                .Include(c => c.Sender)
-                .Include(c => c.Recipient)
                 .Include(c => c.Messages)
-                .Where(c => c.SenderId == currentUser.IdUser || c.RecipientId == currentUser.IdUser)
+                .Include(c => c.User1)
+                .Include(c => c.User2)
+                .Where(c => c.User1Id == currentUserId || c.User2Id == currentUserId)
                 .ToListAsync();
 
-            // Преобразуем данные в удобную модель
-            var result = chats.Select(chat =>
+            var chatList = chats.Select(c =>
             {
-                // Определяем, кто собеседник (не текущий пользователь)
-                var companion = chat.SenderId == currentUser.IdUser
-                    ? chat.Recipient
-                    : chat.Sender;
+                // Определяем собеседника
+                var companion = c.User1Id == currentUserId ? c.User2 : c.User1;
 
-                // Получаем последнее сообщение (если есть)
-                var lastMessage = chat.Messages
+                // Берем последнее сообщение в чате
+                var lastMessage = c.Messages
                     .OrderByDescending(m => m.DateSendMessage)
                     .FirstOrDefault();
 
                 return new ChatUserModel
                 {
-                    ChatId = chat.Id,
+                    ChatId = c.Id,
                     CompanionName = companion.NameUser,
                     CompanionPhoto = companion.PhotoUser,
                     LastMessage = lastMessage?.MessageText,
                     LastMessageDate = lastMessage?.DateSendMessage
                 };
-            }).ToList();
+            })
+            // Сортировка по дате последнего сообщения
+            .OrderByDescending(c => c.LastMessageDate)
+            .ToList();
 
-            return result;
+            return chatList;
         }
         
 

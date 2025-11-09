@@ -7,7 +7,7 @@ using System.Text.Json.Serialization;
 namespace SignalRApp.Models
 {
     [Table("users")]
-    public class UserModel : INotifyPropertyChanged
+    public class UserModel 
     {
         [Key]
         [Column("IdUser")]
@@ -27,12 +27,16 @@ namespace SignalRApp.Models
         public string Pass { get; set; } = null!;
 
         // Навигационные свойства
-        public ICollection<ChatModel> SentChats { get; set; } = new List<ChatModel>();
-        public ICollection<ChatModel> ReceivedChats { get; set; } = new List<ChatModel>();
 
+        // Чаты, где пользователь первый участник
+        [InverseProperty("User1")]
+        public ICollection<ChatModel> ChatsAsUser1 { get; set; } = new List<ChatModel>();
+        // Чаты, где пользователь второй участник
+        [InverseProperty("User2")]
+        public ICollection<ChatModel> ChatsAsUser2 { get; set; } = new List<ChatModel>();
+        // Сообщения, которые пользователь отправил
+        [InverseProperty("Sender")]
+        public ICollection<MessageModel> SentMessages { get; set; } = new List<MessageModel>();
 
-        public event PropertyChangedEventHandler PropertyChanged;
-        public void OnPropertyChanged(string prop = "")
-            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
     }
 }
