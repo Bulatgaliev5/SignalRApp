@@ -1,4 +1,5 @@
-﻿using System.ComponentModel;
+﻿using System;
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -7,53 +8,25 @@ namespace SignalRApp.Models
     [Table("messages")]
     public class MessageModel : INotifyPropertyChanged
     {
-        private int id;
         [Key]
-        public int Id
-        {
-            get => id;
-            set
-            {
-                if (id != value)
-                {
-                    id = value;
-                    OnPropertyChanged();
-                }
-            }
-        }
-        private string message;
-        public string Message
-        {
-            get => message;
-            set
-            {
-                if (message != value)
-                {
-                    message = value;
-                    OnPropertyChanged();
-                }
-            }
-        }
+        [Column("ID")]
+        public int ID { get; set; }
 
-        private DateTime dateSendMessage;
-        public DateTime DateSendMessage
-        {
-            get => dateSendMessage;
-            set
-            {
-                if (dateSendMessage != value)
-                {
-                    dateSendMessage = value;
-                    OnPropertyChanged();
-                }
-            }
-        }
+        [Column("ChatId")]
+        public int ChatId { get; set; }
+
+        [Column("MessageText")]
+        public string MessageText { get; set; } = null!;
+
+        [Column("DateSendMessage")]
+        public DateTime DateSendMessage { get; set; }
+
+        // Навигационное свойство
+        [ForeignKey("ChatId")]
+        public ChatModel Chat { get; set; } = null!;
 
         public event PropertyChangedEventHandler PropertyChanged;
         public void OnPropertyChanged(string prop = "")
-        {
-            if (PropertyChanged != null)
-                PropertyChanged(this, new PropertyChangedEventArgs(prop));
-        }
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
     }
 }

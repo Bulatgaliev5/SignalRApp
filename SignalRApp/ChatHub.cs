@@ -25,7 +25,7 @@ namespace SignalRApp
         public async Task<bool> AuthorizeUser(string login, string password)
         {
             // Пример: поиск пользователя в БД
-            var user = _context.User.FirstOrDefault(u => u.Login == login && u.Pass == password);
+            var user = _context.Users.FirstOrDefault(u => u.Login == login && u.Pass == password);
            
            // var message = _context.Message.FirstOrDefault();
 
@@ -42,20 +42,47 @@ namespace SignalRApp
             return false;
         }
 
-        public async Task<List<ChartUser>> ChatUser(string login)
+        public async Task<List<ChatUserModel>> GetUserChats(string login)
         {
-            // Загружаем пользователя со всеми чатами и сообщениями
-            var user = await _context.User
-                .Include(u => u.ChartUsers)
-                    .ThenInclude(c => c.Message)
+            // Находим текущего пользователя
+            var currentUser = await _context.Users
                 .FirstOrDefaultAsync(u => u.Login == login);
 
-            if (user == null)
-            {
-                return new List<ChartUser>(); // пользователь не найден — возвращаем пустой список
-            }
+            if (currentUser == null)
+                return new List<ChatUserModel>();
 
-            return user.ChartUsers.ToList();
+            // Получаем все чаты, где он — либо отправитель, либо получатель
+            var chats = await _context.Chats
+                .Include(c => c.Sender)
+                .Include(c => c.Recipient)
+                .Include(c => c.Messages)
+                .Where(c => c.SenderId == currentUser.IdUser || c.RecipientId == currentUser.IdUser)
+                .ToListAsync();
+
+            // Преобразуем данные в удобную модель
+            var result = chats.Select(chat =>
+            {
+                // Определяем, кто собеседник (не текущий пользователь)
+                var companion = chat.SenderId == currentUser.IdUser
+                    ? chat.Recipient
+                    : chat.Sender;
+
+                // Получаем последнее сообщение (если есть)
+                var lastMessage = chat.Messages
+                    .OrderByDescending(m => m.DateSendMessage)
+                    .FirstOrDefault();
+
+                return new ChatUserModel
+                {
+                    ChatId = chat.Id,
+                    CompanionName = companion.NameUser,
+                    CompanionPhoto = companion.PhotoUser,
+                    LastMessage = lastMessage?.MessageText,
+                    LastMessageDate = lastMessage?.DateSendMessage
+                };
+            }).ToList();
+
+            return result;
         }
         
 
