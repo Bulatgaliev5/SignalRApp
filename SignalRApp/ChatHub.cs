@@ -14,17 +14,17 @@ namespace SignalRApp
         {
             _context = context;
         }
-        public async Task<bool> AuthorizeUser(string login, string password)
+        public async Task<UserModel> AuthorizeUser(string login, string password)
         {
             // Пример: поиск пользователя в БД
             var user = _context.Users.FirstOrDefault(u => u.Login == login && u.Pass == password);
 
             if (user != null)
             {
-                return true;
+                return user;
             }
 
-            return false;
+            return null;
         }
 
         public async Task<List<ChatUserModel>> GetUserChats(string login)
