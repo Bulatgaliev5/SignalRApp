@@ -17,13 +17,13 @@ namespace SignalRApp
                     new MySqlServerVersion(new Version(8, 0, 43))
                 )
             );
-            // Настройка Kestrel для Render
-            //var port = Environment.GetEnvironmentVariable("PORT") ?? "80";
+            //Настройка Kestrel для Render
+            var port = Environment.GetEnvironmentVariable("PORT") ?? "80";
 
-            //builder.WebHost.ConfigureKestrel(options =>
-            //{
-            //    options.ListenAnyIP(int.Parse(port)); // слушаем на порту Render
-            //});
+            builder.WebHost.ConfigureKestrel(options =>
+            {
+                options.ListenAnyIP(int.Parse(port)); // слушаем на порту Render
+            });
 
             var app = builder.Build();
 
