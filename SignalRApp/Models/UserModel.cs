@@ -21,7 +21,8 @@ namespace SignalRApp.Models
 
         [Column("Login")]
         public string Login { get; set; } = null!;
-
+        [Column("ConnectionId")]
+        public string? ConnectionId { get; set; } // <-- добавляем это поле
 
         [Column("Pass")]
         public string Pass { get; set; } = null!;
