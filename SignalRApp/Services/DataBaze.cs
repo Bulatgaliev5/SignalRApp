@@ -1,16 +1,17 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using SignalRApp.Models;
+using SignalRApp.ChatFolder;
+using SignalRApp.MessageFolder;
+using SignalRApp.UserFolder;
 using System;
 
 namespace SignalRApp.Services
 {
     public class DataBaze : DbContext
     {
-        public DbSet<UserModel> Users { get; set; } = null!;
-        public DbSet<ChatModel> Chats { get; set; } = null!;
-        public DbSet<MessageModel> Messages { get; set; } = null!;
+        public DbSet<User> Users { get; set; }
+        public DbSet<Chat> Chats { get; set; }
+        public DbSet<Message> Messages { get; set; }
 
-        // ✅ Конструктор для DI
         public DataBaze(DbContextOptions<DataBaze> options)
             : base(options)
         {

@@ -1,8 +1,10 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
-using SignalRApp.Models;
+using SignalRApp.ChatFolder;
+using SignalRApp.MessageFolder;
 using SignalRApp.Services;
+using SignalRApp.UserFolder;
 using System.Reflection;
 
 namespace SignalRApp
@@ -10,15 +12,18 @@ namespace SignalRApp
 
     public class ChatHub: Hub
     {
-        private readonly DataBaze _context;
         public ChatHub(DataBaze context)
         {
-            _context = context;
+            context = context;
         }
-        public async Task<UserModel> AuthorizeUser(string login, string password)
+        #region Поля и свойства
+        private readonly DataBaze context;
+        #endregion
+        #region Методы
+        public async Task<User> AuthorizeUser(string login, string password)
         {
             // Пример: поиск пользователя в БД
-            var user = _context.Users.FirstOrDefault(u => u.Login == login && u.Pass == password);
+            var user = context.Users.FirstOrDefault(u => u.Login == login && u.Pass == password);
 
             if (user != null)
             {
@@ -29,27 +34,27 @@ namespace SignalRApp
         }
         public async Task SaveConnectionId(int userId)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.IdUser == userId);
+            var user = await context.Users.FirstOrDefaultAsync(u => u.IdUser == userId);
             if (user != null)
             {
                 user.ConnectionId = Context.ConnectionId;
-                _context.Users.Update(user);
-                await _context.SaveChangesAsync();
+                context.Users.Update(user);
+                await context.SaveChangesAsync();
             }
         }
-        public async Task<List<ChatUserModel>> GetUserChats(string login)
+        public async Task<List<ChatUser>> GetUserChats(string login)
         {
             // Находим текущего пользователя
-            var currentUser = await _context.Users
+            var currentUser = await context.Users
                 .FirstOrDefaultAsync(u => u.Login == login);
 
             if (currentUser == null)
-                return new List<ChatUserModel>();
+                return new List<ChatUser>();
 
             int currentUserId = currentUser.IdUser;
 
             // Получаем все чаты, где участвует пользователь
-            var chats = await _context.Chats
+            var chats = await context.Chats
                 .Include(c => c.Messages)
                 .Include(c => c.User1)
                 .Include(c => c.User2)
@@ -65,7 +70,7 @@ namespace SignalRApp
                     .OrderByDescending(m => m.DateSendMessage)
                     .FirstOrDefault();
 
-                return new ChatUserModel
+                return new ChatUser
                 {
                     ChatId = c.Id,
                     CompanionName = companion.NameUser,
@@ -83,14 +88,14 @@ namespace SignalRApp
         }
 
 
-        public async Task<List<MessageChatModel>> GetSelectedChatUser(int ChatId)
+        public async Task<List<MessageChat>> GetSelectedChatUser(int ChatId)
         {
-            var messages = await _context.Messages
-                .Include(m => m.Sender)
+            var messages = await context.Messages
+                .Include(m => m.Sender) 
                 .Include(m => m.Chat)
                 .Where(m => m.ChatId == ChatId)
                 .OrderBy(m => m.DateSendMessage)
-                .Select(m => new MessageChatModel
+                .Select(m => new MessageChat
                 {
                     ID = m.ID,
                     ChatId = m.ChatId,
@@ -111,7 +116,7 @@ namespace SignalRApp
 
             try
             {
-                var msg = new MessageModel
+                var msg = new Message
                 {
                     ChatId = ChatId,
                     SenderId = IdUser,
@@ -120,14 +125,14 @@ namespace SignalRApp
                 };
 
                 // ✅ 1. Сохраняем сообщение в БД
-                _context.Messages.Add(msg);
-                await _context.SaveChangesAsync();
+                context.Messages.Add(msg);
+                await context.SaveChangesAsync();
 
                 // ✅ 2. Отправляем сообщение обоим участникам чата
                 // Чтобы работало, пользователи должны быть "зарегистрированы" по ConnectionId
                 // Создаём типизированную модель для отправки клиенту
-                var sender = await _context.Users.FirstOrDefaultAsync(u => u.IdUser == IdUser);
-                var messageDto = new MessageChatModel
+                var sender = await context.Users.FirstOrDefaultAsync(u => u.IdUser == IdUser);
+                var messageDto = new MessageChat
                 {
                     ID = msg.ID,
                     ChatId = msg.ChatId,
@@ -139,7 +144,7 @@ namespace SignalRApp
                 };
 
                 // Находим получателя
-                var receiver = await _context.Users.FirstOrDefaultAsync(u => u.IdUser == CompanionID);
+                var receiver = await context.Users.FirstOrDefaultAsync(u => u.IdUser == CompanionID);
 
                 // Отправляем получателю
                 if (!string.IsNullOrEmpty(receiver?.ConnectionId))
@@ -170,7 +175,7 @@ namespace SignalRApp
         {
             await Clients.All.SendAsync("Receive", userName, message);
         }
-
+        #endregion
 
     }
 }

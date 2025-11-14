@@ -4,6 +4,7 @@ namespace SignalRApp.Services
 {
     public class CustomUserIdProvider : IUserIdProvider
     {
+        //TODO: Может быть сделать авторизацию в параметры подключения
         public string? GetUserId(HubConnectionContext connection)
         {
             // Берем userId из query-параметра подключения

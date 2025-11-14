@@ -1,12 +1,14 @@
-﻿using System;
+﻿using SignalRApp.ChatFolder;
+using SignalRApp.UserFolder;
+using System;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace SignalRApp.Models
+namespace SignalRApp.MessageFolder
 {
     [Table("messages")]
-    public class MessageModel
+    public class Message
     {
         [Key]
         [Column("ID")]
@@ -18,16 +20,16 @@ namespace SignalRApp.Models
         public int SenderId { get; set; }
 
         [Column("MessageText")]
-        public string MessageText { get; set; } = null!;
+        public string MessageText { get; set; }
 
         [Column("DateSendMessage")]
         public DateTime DateSendMessage { get; set; }
 
         // Навигационное свойство
         [ForeignKey("ChatId")]
-        public ChatModel Chat { get; set; } = null!;
+        public Chat Chat { get; set; }
         [ForeignKey("SenderId")]
-        public UserModel Sender { get; set; } = null!;
+        public User Sender { get; set; }
 
     }
 }
