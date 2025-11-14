@@ -14,7 +14,7 @@ namespace SignalRApp
     {
         public ChatHub(DataBaze context)
         {
-            context = context;
+            this.context = context;
         }
         #region Поля и свойства
         private readonly DataBaze context;
