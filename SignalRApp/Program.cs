@@ -13,7 +13,10 @@ namespace SignalRApp
             // Подключаем DbContext с MySQL
             builder.Services.AddDbContext<DataBaze>(options =>
                 options.UseMySql(
-                    "server=192.168.0.114;user=root;password=yfhenjcfcrt56;database=signalrdb;",
+                    "server=b0tolpm6z0tvjabtprlb-mysql.services.clever-cloud.com;" +
+                    "user=utgbhvnerpsf6soi;" +
+                    "password=tsKufIRfTz6kcSO8GfWG;" +
+                    "database=b0tolpm6z0tvjabtprlb;",
                     new MySqlServerVersion(new Version(8, 0, 43))
                 )
             );
