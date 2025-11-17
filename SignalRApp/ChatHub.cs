@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using FirebaseAdmin.Auth;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using SignalRApp.ChatFolder;
@@ -6,11 +7,12 @@ using SignalRApp.MessageFolder;
 using SignalRApp.Services;
 using SignalRApp.UserFolder;
 using System.Reflection;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
 namespace SignalRApp
 {
 
-    public class ChatHub: Hub
+    public class ChatHub : Hub
     {
         public ChatHub(DataBaze context)
         {
@@ -20,17 +22,49 @@ namespace SignalRApp
         private readonly DataBaze context;
         #endregion
         #region Методы
-        public async Task<User> AuthorizeUser(string login, string password)
+        public async Task<User> AuthorizeFirebase(string idToken)
         {
-            // Пример: поиск пользователя в БД
-            var user = context.Users.FirstOrDefault(u => u.Login == login && u.Pass == password);
-
-            if (user != null)
+            try
             {
+                // Проверяем токен Firebase
+                FirebaseToken decodedToken = await FirebaseAuth.DefaultInstance
+                    .VerifyIdTokenAsync(idToken);
+
+                string firebaseUid = decodedToken.Uid;
+                string email = decodedToken.Claims["email"].ToString();
+
+                // Ищем пользователя в вашей БД
+                var user = await context.Users
+                    .FirstOrDefaultAsync(u => u.Login == email);
+
+                // Если нет — регистрируем автоматически
+                if (user == null)
+                {
+                    user = new User
+                    {
+                        Login = email,
+                        Pass = "123456",
+                        PhotoUser = "123456",
+                        //NameUser = email.Split('@')[0],
+                        NameUser = email.Split('@')[0],
+                        ConnectionId = Context.ConnectionId
+                    };
+
+                    context.Users.Add(user);
+                    await context.SaveChangesAsync();
+                }
+
+                // Сохраняем ConnectionId
+                user.ConnectionId = Context.ConnectionId;
+                await context.SaveChangesAsync();
+
                 return user;
             }
-
-            return null;
+            catch (Exception ex)
+            {
+                Console.WriteLine("Auth error: " + ex.Message);
+                return null;
+            }
         }
         public async Task SaveConnectionId(int userId)
         {
@@ -91,7 +125,7 @@ namespace SignalRApp
         public async Task<List<MessageChat>> GetSelectedChatUser(int ChatId)
         {
             var messages = await context.Messages
-                .Include(m => m.Sender) 
+                .Include(m => m.Sender)
                 .Include(m => m.Chat)
                 .Where(m => m.ChatId == ChatId)
                 .OrderBy(m => m.DateSendMessage)
@@ -110,7 +144,7 @@ namespace SignalRApp
             return messages;
         }
 
-        public async Task<bool> SentMessageUser(int ChatId, int CompanionID, 
+        public async Task<bool> SentMessageUser(int ChatId, int CompanionID,
             int IdUser, string Message, DateTime dateTime, string ConnectionId)
         {
 
@@ -159,9 +193,9 @@ namespace SignalRApp
                 }
 
                 return true;
-            
 
-               
+
+
             }
             catch (Exception ex)
             {

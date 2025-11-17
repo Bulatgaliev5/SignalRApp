@@ -1,5 +1,9 @@
+
+using Microsoft.AspNetCore.Builder.Extensions;
 using Microsoft.EntityFrameworkCore;
 using SignalRApp.Services;
+using FirebaseAdmin;
+using Google.Apis.Auth.OAuth2;
 
 namespace SignalRApp
 {
@@ -10,6 +14,11 @@ namespace SignalRApp
             var builder = WebApplication.CreateBuilder(args);
             builder.Services.AddSignalR();
 
+            // Инициализация Firebase
+            FirebaseApp.Create(new AppOptions()
+            {
+                Credential = GoogleCredential.FromFile("signalr-3e0a0-firebase-adminsdk-fbsvc-bf0faf1ab0.json")
+            });
             // Подключаем DbContext с MySQL
             builder.Services.AddDbContext<DataBaze>(options =>
                 options.UseMySql(
