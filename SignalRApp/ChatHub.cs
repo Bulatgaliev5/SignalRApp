@@ -22,7 +22,52 @@ namespace SignalRApp
         private readonly DataBaze context;
         #endregion
         #region Методы
-        public async Task<User> AuthorizeFirebase(string idToken)
+
+        public async Task<User> AuthorizeFirebase1(string idToken)
+        {
+            try
+            {
+                // Проверяем токен Firebase
+                FirebaseToken decodedToken = await FirebaseAuth.DefaultInstance
+                    .VerifyIdTokenAsync(idToken);
+
+                string firebaseUid = decodedToken.Uid;
+                string email = decodedToken.Claims["email"].ToString();
+
+                // Ищем пользователя в вашей БД
+                var user = await context.Users
+                    .FirstOrDefaultAsync(u => u.Login == email);
+
+                // Если нет — регистрируем автоматически
+                //if (user == null)
+                //{
+                //    user = new User
+                //    {
+                //        Login = email,
+                //        Pass = user1.Pass,
+                //        PhotoUser = user1.PhotoUser,
+                //        //NameUser = email.Split('@')[0],
+                //        NameUser = user1.NameUser,
+                //        ConnectionId = Context.ConnectionId
+                //    };
+
+                //    context.Users.Add(user);
+                //    await context.SaveChangesAsync();
+                //}
+
+                // Сохраняем ConnectionId
+                user.ConnectionId = Context.ConnectionId;
+                await context.SaveChangesAsync();
+
+                return user;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Auth error: " + ex.Message);
+                return null;
+            }
+        }
+        public async Task<User> AuthorizeFirebase(string idToken, User user1)
         {
             try
             {
@@ -43,10 +88,10 @@ namespace SignalRApp
                     user = new User
                     {
                         Login = email,
-                        Pass = "123456",
-                        PhotoUser = "123456",
+                        Pass = user1.Pass,
+                        PhotoUser = user1.PhotoUser,
                         //NameUser = email.Split('@')[0],
-                        NameUser = email.Split('@')[0],
+                        NameUser = user1.NameUser,
                         ConnectionId = Context.ConnectionId
                     };
 
@@ -209,7 +254,9 @@ namespace SignalRApp
         {
             await Clients.All.SendAsync("Receive", userName, message);
         }
+
         #endregion
+
 
     }
 }
