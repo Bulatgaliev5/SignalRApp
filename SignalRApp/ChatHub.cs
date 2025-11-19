@@ -154,6 +154,100 @@ namespace SignalRApp
             return chatList;
         }
 
+        public async Task<ChatUser> GetUserChat(string email, int companionId)
+        {
+            // Находим текущего пользователя
+            var currentUser = await context.Users
+                .FirstOrDefaultAsync(u => u.Email == email);
+
+            if (currentUser == null)
+                return null;
+
+            int currentUserId = currentUser.IdUser;
+
+            // Ищем чат только между двух пользователей
+            var chat = await context.Chats
+                .Include(c => c.Messages)
+                .Include(c => c.User1)
+                .Include(c => c.User2)
+                .FirstOrDefaultAsync(c =>
+                    (c.User1Id == currentUserId && c.User2Id == companionId) ||
+                    (c.User2Id == currentUserId && c.User1Id == companionId)
+                );
+
+            // Если нет — создаём
+            if (chat == null)
+            {
+                chat = new Chat
+                {
+                    User1Id = currentUserId,
+                    User2Id = companionId,
+                };
+
+                context.Chats.Add(chat);
+                await context.SaveChangesAsync();
+
+                // Загружаем пользователей
+                chat = await context.Chats
+                    .Include(c => c.User1)
+                    .Include(c => c.User2)
+                    .FirstOrDefaultAsync(c => c.Id == chat.Id);
+            }
+
+            // Определяем собеседника
+            var companion = chat.User1Id == currentUserId ? chat.User2 : chat.User1;
+            var lastMessage = chat.Messages
+                .OrderByDescending(m => m.DateSendMessage)
+                .FirstOrDefault();
+            if (chat.Messages.Count==0)
+            {
+                lastMessage = new Message
+                {
+                    ChatId = chat.Id,
+                    SenderId = currentUserId,
+                    MessageText = "Привет!",
+                    DateSendMessage = DateTime.Now,
+                };
+
+                context.Messages.Add(lastMessage);
+                await context.SaveChangesAsync();
+            }
+            //// Последнее сообщение
+            //var lastMessage = chat.Messages
+            //    .OrderByDescending(m => m.DateSendMessage)
+            //    .FirstOrDefault();
+            // Отправляем получателю
+
+            var chatuser = new ChatUser
+            {
+                ChatId = chat.Id,
+                CompanionName = companion.NameUser,
+                CompanionPhoto = companion.PhotoUser,
+                CompanionID = companion.IdUser,
+                LastMessage = lastMessage?.MessageText,
+                LastMessageDate = lastMessage?.DateSendMessage
+            };
+            //if (!string.IsNullOrEmpty(receiver?.ConnectionId))
+            //{
+            //    await Clients.Client(receiver.ConnectionId).SendAsync("ReceiveMessage", chatuser);
+            //}
+
+            // Отправляем самому отправителю (для отображения своего сообщения)
+            //if (!string.IsNullOrEmpty(currentUser?.ConnectionId))
+            //{
+            //    await Clients.Client(currentUser.ConnectionId).SendAsync("ReceiveUserChat", chatuser);
+            //}
+            if (!string.IsNullOrEmpty(currentUser.ConnectionId))
+            {
+                await Clients.Client(currentUser.ConnectionId).SendAsync("ReceiveUserChat", chatuser);
+            }
+
+            if (!string.IsNullOrEmpty(companion.ConnectionId))
+            {
+                await Clients.Client(companion.ConnectionId).SendAsync("ReceiveUserChat", chatuser);
+            }
+            return chatuser;
+        }
 
         public async Task<List<MessageChat>> GetSelectedChatUser(int ChatId)
         {
@@ -175,6 +269,17 @@ namespace SignalRApp
                 .ToListAsync();
 
             return messages;
+        }
+
+        public async Task<List<User>> SearchUserServer(string nickname, User user)
+        {
+            //var users = await context.Users
+            //    .Where(u => u.Nickname == nickname)
+            //    .ToListAsync();
+            var users = await context.Users
+                .Where(u => EF.Functions.Like(u.Nickname!, $"%{nickname}%") && u.Nickname != user.Nickname).ToListAsync();
+
+            return users;
         }
 
         public async Task<bool> SentMessageUser(int ChatId, int CompanionID,
