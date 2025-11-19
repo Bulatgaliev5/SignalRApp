@@ -21,13 +21,15 @@ namespace SignalRApp.UserFolder
         [Column("PhotoUser")]
         public string PhotoUser { get; set; }
 
-        [Column("Login")]
-        public string Login { get; set; }
+        [Column("Email")]
+        public string Email { get; set; }
         [Column("ConnectionId")]
         public string? ConnectionId { get; set; } 
 
         [Column("Pass")]
         public string Pass { get; set; }
+        [Column("Nickname")]
+        public string Nickname { get; set; }
 
         // Навигационные свойства
 

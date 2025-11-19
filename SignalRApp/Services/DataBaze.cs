@@ -12,6 +12,8 @@ namespace SignalRApp.Services
         public DbSet<Chat> Chats { get; set; }
         public DbSet<Message> Messages { get; set; }
 
+        public DbSet<Session> Sessions { get; set; }
+
         public DataBaze(DbContextOptions<DataBaze> options)
             : base(options)
         {

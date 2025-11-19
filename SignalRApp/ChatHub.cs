@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using FirebaseAdmin.Auth;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using SignalRApp.ChatFolder;
@@ -6,11 +7,12 @@ using SignalRApp.MessageFolder;
 using SignalRApp.Services;
 using SignalRApp.UserFolder;
 using System.Reflection;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
 namespace SignalRApp
 {
 
-    public class ChatHub: Hub
+    public class ChatHub : Hub
     {
         public ChatHub(DataBaze context)
         {
@@ -20,17 +22,82 @@ namespace SignalRApp
         private readonly DataBaze context;
         #endregion
         #region Методы
-        public async Task<User> AuthorizeUser(string login, string password)
-        {
-            // Пример: поиск пользователя в БД
-            var user = context.Users.FirstOrDefault(u => u.Login == login && u.Pass == password);
 
-            if (user != null)
+        public async Task<User> AuthorizeFirebase(string idToken)
+        {
+            try
             {
+                // Проверяем токен Firebase
+                FirebaseToken decodedToken = await FirebaseAuth.DefaultInstance
+                    .VerifyIdTokenAsync(idToken);
+
+                string firebaseUid = decodedToken.Uid;
+                string email = decodedToken.Claims["email"].ToString();
+
+                // Ищем пользователя в БД
+                var user = await context.Users
+                    .FirstOrDefaultAsync(u => u.Email == email);
+
+                // Сохраняем ConnectionId
+                user.ConnectionId = Context.ConnectionId;
+                await context.SaveChangesAsync();
+
                 return user;
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Auth error: " + ex.Message);
+                return null;
+            }
+        }
+        public async Task<User> RegistrationFirebase(string idToken, User user1)
+        {
+            try
+            {
+                // Проверяем токен Firebase
+                FirebaseToken decodedToken = await FirebaseAuth.DefaultInstance
+                    .VerifyIdTokenAsync(idToken);
 
-            return null;
+                string firebaseUid = decodedToken.Uid;
+                string email = decodedToken.Claims["email"].ToString();
+
+                // Ищем пользователя в БД
+                var user = await context.Users
+                    .FirstOrDefaultAsync(u => u.Email == email);
+
+                if (user != null)
+                {
+                    return null;
+                }
+
+                // Если нет  регистрируем автоматически
+                if (user == null)
+                {
+                    user = new User
+                    {
+                        Email = email,
+                        Pass = user1.Pass,
+                        PhotoUser = user1.PhotoUser,
+                        Nickname = email.Split('@')[0],
+                        NameUser = user1.NameUser,
+                        ConnectionId = Context.ConnectionId
+                    };
+
+                    context.Users.Add(user);
+                    await context.SaveChangesAsync();
+                }
+
+                // Сохраняем ConnectionId
+                user.ConnectionId = Context.ConnectionId;
+                await context.SaveChangesAsync();
+
+                return user;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Auth error: " + ex.Message);
+                return null;
+            }
         }
         public async Task SaveConnectionId(int userId)
         {
@@ -42,11 +109,11 @@ namespace SignalRApp
                 await context.SaveChangesAsync();
             }
         }
-        public async Task<List<ChatUser>> GetUserChats(string login)
+        public async Task<List<ChatUser>> GetUserChats(string email)
         {
             // Находим текущего пользователя
             var currentUser = await context.Users
-                .FirstOrDefaultAsync(u => u.Login == login);
+                .FirstOrDefaultAsync(u => u.Email == email);
 
             if (currentUser == null)
                 return new List<ChatUser>();
@@ -87,11 +154,105 @@ namespace SignalRApp
             return chatList;
         }
 
+        public async Task<ChatUser> GetUserChat(string email, int companionId)
+        {
+            // Находим текущего пользователя
+            var currentUser = await context.Users
+                .FirstOrDefaultAsync(u => u.Email == email);
+
+            if (currentUser == null)
+                return null;
+
+            int currentUserId = currentUser.IdUser;
+
+            // Ищем чат только между двух пользователей
+            var chat = await context.Chats
+                .Include(c => c.Messages)
+                .Include(c => c.User1)
+                .Include(c => c.User2)
+                .FirstOrDefaultAsync(c =>
+                    (c.User1Id == currentUserId && c.User2Id == companionId) ||
+                    (c.User2Id == currentUserId && c.User1Id == companionId)
+                );
+
+            // Если нет — создаём
+            if (chat == null)
+            {
+                chat = new Chat
+                {
+                    User1Id = currentUserId,
+                    User2Id = companionId,
+                };
+
+                context.Chats.Add(chat);
+                await context.SaveChangesAsync();
+
+                // Загружаем пользователей
+                chat = await context.Chats
+                    .Include(c => c.User1)
+                    .Include(c => c.User2)
+                    .FirstOrDefaultAsync(c => c.Id == chat.Id);
+            }
+
+            // Определяем собеседника
+            var companion = chat.User1Id == currentUserId ? chat.User2 : chat.User1;
+            var lastMessage = chat.Messages
+                .OrderByDescending(m => m.DateSendMessage)
+                .FirstOrDefault();
+            if (chat.Messages.Count==0)
+            {
+                lastMessage = new Message
+                {
+                    ChatId = chat.Id,
+                    SenderId = currentUserId,
+                    MessageText = "Привет!",
+                    DateSendMessage = DateTime.Now,
+                };
+
+                context.Messages.Add(lastMessage);
+                await context.SaveChangesAsync();
+            }
+            //// Последнее сообщение
+            //var lastMessage = chat.Messages
+            //    .OrderByDescending(m => m.DateSendMessage)
+            //    .FirstOrDefault();
+            // Отправляем получателю
+
+            var chatuser = new ChatUser
+            {
+                ChatId = chat.Id,
+                CompanionName = companion.NameUser,
+                CompanionPhoto = companion.PhotoUser,
+                CompanionID = companion.IdUser,
+                LastMessage = lastMessage?.MessageText,
+                LastMessageDate = lastMessage?.DateSendMessage
+            };
+            //if (!string.IsNullOrEmpty(receiver?.ConnectionId))
+            //{
+            //    await Clients.Client(receiver.ConnectionId).SendAsync("ReceiveMessage", chatuser);
+            //}
+
+            // Отправляем самому отправителю (для отображения своего сообщения)
+            //if (!string.IsNullOrEmpty(currentUser?.ConnectionId))
+            //{
+            //    await Clients.Client(currentUser.ConnectionId).SendAsync("ReceiveUserChat", chatuser);
+            //}
+            if (!string.IsNullOrEmpty(currentUser.ConnectionId))
+            {
+                await Clients.Client(currentUser.ConnectionId).SendAsync("ReceiveUserChat", chatuser);
+            }
+
+            if (!string.IsNullOrEmpty(companion.ConnectionId))
+            {
+                await Clients.Client(companion.ConnectionId).SendAsync("ReceiveUserChat", chatuser);
+            }
+            return chatuser;
+        }
 
         public async Task<List<MessageChat>> GetSelectedChatUser(int ChatId)
         {
             var messages = await context.Messages
-                .Include(m => m.Sender) 
+                .Include(m => m.Sender)
                 .Include(m => m.Chat)
                 .Where(m => m.ChatId == ChatId)
                 .OrderBy(m => m.DateSendMessage)
@@ -110,7 +271,18 @@ namespace SignalRApp
             return messages;
         }
 
-        public async Task<bool> SentMessageUser(int ChatId, int CompanionID, 
+        public async Task<List<User>> SearchUserServer(string nickname, User user)
+        {
+            //var users = await context.Users
+            //    .Where(u => u.Nickname == nickname)
+            //    .ToListAsync();
+            var users = await context.Users
+                .Where(u => EF.Functions.Like(u.Nickname!, $"%{nickname}%") && u.Nickname != user.Nickname).ToListAsync();
+
+            return users;
+        }
+
+        public async Task<bool> SentMessageUser(int ChatId, int CompanionID,
             int IdUser, string Message, DateTime dateTime, string ConnectionId)
         {
 
@@ -124,13 +296,11 @@ namespace SignalRApp
                     DateSendMessage = DateTime.Now
                 };
 
-                // ✅ 1. Сохраняем сообщение в БД
+                // Сохраняем сообщение в БД
                 context.Messages.Add(msg);
                 await context.SaveChangesAsync();
 
-                // ✅ 2. Отправляем сообщение обоим участникам чата
-                // Чтобы работало, пользователи должны быть "зарегистрированы" по ConnectionId
-                // Создаём типизированную модель для отправки клиенту
+                // Отправляем сообщение обоим участникам чата
                 var sender = await context.Users.FirstOrDefaultAsync(u => u.IdUser == IdUser);
                 var messageDto = new MessageChat
                 {
@@ -159,9 +329,9 @@ namespace SignalRApp
                 }
 
                 return true;
-            
 
-               
+
+
             }
             catch (Exception ex)
             {
@@ -171,11 +341,51 @@ namespace SignalRApp
             }
         }
 
+        //Метод создания сессии, если нету
+        public async Task<Session> CreateSession(User user, string device)
+        {
+            var newSession = new Session
+            {
+               // SessionId = Guid.NewGuid().ToString(),
+                UserId = user.IdUser,
+                RefreshToken = Guid.NewGuid().ToString(),
+                DeviceInfo = device,
+                CreatedAt = DateTime.UtcNow,
+                // 7 дней действует сессия
+                ExpiresAt = DateTime.UtcNow.AddDays(7)
+            };
+
+            context.Sessions.Add(newSession);
+            await context.SaveChangesAsync();
+
+            return newSession;
+        }
+        //Метод повторной авторизации, когда есть сессия
+        
+        public async Task<User> AuthorizeByRefresh(string refreshToken)
+        {
+            var session = await context.Sessions
+                .Include(s => s.User)
+                // Условия
+                .FirstOrDefaultAsync(s => s.RefreshToken == refreshToken  && s.ExpiresAt > DateTime.UtcNow);
+
+            if (session == null)
+                return null;
+
+            // Обновляем ConnectionId
+            session.User.ConnectionId = Context.ConnectionId;
+
+            await context.SaveChangesAsync();
+            return session.User;
+        }
+
         public async Task SendMessage(string userName, string message)
         {
             await Clients.All.SendAsync("Receive", userName, message);
         }
+
         #endregion
+
 
     }
 }
