@@ -23,7 +23,7 @@ namespace SignalRApp
         #endregion
         #region Методы
 
-        public async Task<User> AuthorizeFirebase1(string idToken)
+        public async Task<User> AuthorizeFirebase(string idToken)
         {
             try
             {
@@ -34,26 +34,9 @@ namespace SignalRApp
                 string firebaseUid = decodedToken.Uid;
                 string email = decodedToken.Claims["email"].ToString();
 
-                // Ищем пользователя в вашей БД
+                // Ищем пользователя в БД
                 var user = await context.Users
-                    .FirstOrDefaultAsync(u => u.Login == email);
-
-                // Если нет — регистрируем автоматически
-                //if (user == null)
-                //{
-                //    user = new User
-                //    {
-                //        Login = email,
-                //        Pass = user1.Pass,
-                //        PhotoUser = user1.PhotoUser,
-                //        //NameUser = email.Split('@')[0],
-                //        NameUser = user1.NameUser,
-                //        ConnectionId = Context.ConnectionId
-                //    };
-
-                //    context.Users.Add(user);
-                //    await context.SaveChangesAsync();
-                //}
+                    .FirstOrDefaultAsync(u => u.Email == email);
 
                 // Сохраняем ConnectionId
                 user.ConnectionId = Context.ConnectionId;
@@ -67,7 +50,7 @@ namespace SignalRApp
                 return null;
             }
         }
-        public async Task<User> AuthorizeFirebase(string idToken, User user1)
+        public async Task<User> RegistrationFirebase(string idToken, User user1)
         {
             try
             {
@@ -78,19 +61,24 @@ namespace SignalRApp
                 string firebaseUid = decodedToken.Uid;
                 string email = decodedToken.Claims["email"].ToString();
 
-                // Ищем пользователя в вашей БД
+                // Ищем пользователя в БД
                 var user = await context.Users
-                    .FirstOrDefaultAsync(u => u.Login == email);
+                    .FirstOrDefaultAsync(u => u.Email == email);
 
-                // Если нет — регистрируем автоматически
+                if (user != null)
+                {
+                    return null;
+                }
+
+                // Если нет  регистрируем автоматически
                 if (user == null)
                 {
                     user = new User
                     {
-                        Login = email,
+                        Email = email,
                         Pass = user1.Pass,
                         PhotoUser = user1.PhotoUser,
-                        //NameUser = email.Split('@')[0],
+                        Nickname = email.Split('@')[0],
                         NameUser = user1.NameUser,
                         ConnectionId = Context.ConnectionId
                     };
@@ -121,11 +109,11 @@ namespace SignalRApp
                 await context.SaveChangesAsync();
             }
         }
-        public async Task<List<ChatUser>> GetUserChats(string login)
+        public async Task<List<ChatUser>> GetUserChats(string email)
         {
             // Находим текущего пользователя
             var currentUser = await context.Users
-                .FirstOrDefaultAsync(u => u.Login == login);
+                .FirstOrDefaultAsync(u => u.Email == email);
 
             if (currentUser == null)
                 return new List<ChatUser>();
@@ -203,13 +191,11 @@ namespace SignalRApp
                     DateSendMessage = DateTime.Now
                 };
 
-                // ✅ 1. Сохраняем сообщение в БД
+                // Сохраняем сообщение в БД
                 context.Messages.Add(msg);
                 await context.SaveChangesAsync();
 
-                // ✅ 2. Отправляем сообщение обоим участникам чата
-                // Чтобы работало, пользователи должны быть "зарегистрированы" по ConnectionId
-                // Создаём типизированную модель для отправки клиенту
+                // Отправляем сообщение обоим участникам чата
                 var sender = await context.Users.FirstOrDefaultAsync(u => u.IdUser == IdUser);
                 var messageDto = new MessageChat
                 {
@@ -248,6 +234,44 @@ namespace SignalRApp
                 Console.WriteLine(ex);
                 return false;
             }
+        }
+
+        //Метод создания сессии, если нету
+        public async Task<Session> CreateSession(User user, string device)
+        {
+            var newSession = new Session
+            {
+               // SessionId = Guid.NewGuid().ToString(),
+                UserId = user.IdUser,
+                RefreshToken = Guid.NewGuid().ToString(),
+                DeviceInfo = device,
+                CreatedAt = DateTime.UtcNow,
+                // 7 дней действует сессия
+                ExpiresAt = DateTime.UtcNow.AddDays(7)
+            };
+
+            context.Sessions.Add(newSession);
+            await context.SaveChangesAsync();
+
+            return newSession;
+        }
+        //Метод повторной авторизации, когда есть сессия
+        
+        public async Task<User> AuthorizeByRefresh(string refreshToken)
+        {
+            var session = await context.Sessions
+                .Include(s => s.User)
+                // Условия
+                .FirstOrDefaultAsync(s => s.RefreshToken == refreshToken  && s.ExpiresAt > DateTime.UtcNow);
+
+            if (session == null)
+                return null;
+
+            // Обновляем ConnectionId
+            session.User.ConnectionId = Context.ConnectionId;
+
+            await context.SaveChangesAsync();
+            return session.User;
         }
 
         public async Task SendMessage(string userName, string message)
