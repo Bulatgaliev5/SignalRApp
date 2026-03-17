@@ -11,7 +11,12 @@ namespace SignalRApp.UserFolder
         public int SessionId { get; set; }
         public int UserId { get; set; }
         public string RefreshToken { get; set; }
-        public string DeviceInfo { get; set; }
+        public string NameDevice { get; set; }
+        public string Model { get; set; }
+        public string OS { get; set; }
+        public string IP_adress { get; set; }
+        public string IP_adress_city { get; set; }
+        public string IP_adress_country { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime ExpiresAt { get; set; }
 
