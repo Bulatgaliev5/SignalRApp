@@ -288,30 +288,6 @@ namespace SignalRApp
             return users;
         }
 
-
-        private static byte[] GetIV(string ivSecret)
-        {
-            using MD5 md5 = MD5.Create();
-            return md5.ComputeHash(Encoding.UTF8.GetBytes(ivSecret));
-        }
-        private static byte[] GetKey(string key)
-        {
-            using SHA256 sha256 = SHA256.Create();
-            return sha256.ComputeHash(Encoding.UTF8.GetBytes(key));
-        }
-
-        //private void AES()
-        //{
-        //    string key = "секретный ключ"; //ключ для шифрования
-        //    string ivSecret = "вектор"; //вектор инициализации
-
-        //    using Aes aes = Aes.Create();
-        //    aes.IV = GetIV(ivSecret);
-        //    aes.Key = GetKey(key);
-
-        //    CryptoStream encStream = new CryptoStream(outStream, aes.CreateEncryptor(aes.Key, aes.IV), CryptoStreamMode.Write);
-        //}
-
         public async Task<bool> SentMessageUser(int ChatId, int CompanionID,
             int IdUser, string Message, DateTime dateTime, string ConnectionId)
         {
