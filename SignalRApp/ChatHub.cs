@@ -1,4 +1,6 @@
 ﻿using FirebaseAdmin.Auth;
+using IPinfo;
+using IPinfo.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -342,14 +344,20 @@ namespace SignalRApp
         }
 
         //Метод создания сессии, если нету
-        public async Task<Session> CreateSession(User user, string device)
+        public async Task<Session> CreateSession(User user, string os, string model, string nameDevice)
         {
+            var infoIP = GetInfo_IP_adress().Result;
             var newSession = new Session
             {
                // SessionId = Guid.NewGuid().ToString(),
                 UserId = user.IdUser,
                 RefreshToken = Guid.NewGuid().ToString(),
-                DeviceInfo = device,
+                OS = os,
+                Model = model,
+                NameDevice = nameDevice,
+                IP_adress = infoIP[0].ToString(),
+                IP_adress_country = infoIP[1].ToString(),
+                IP_adress_city = infoIP[2].ToString(),
                 CreatedAt = DateTime.UtcNow,
                 // 7 дней действует сессия
                 ExpiresAt = DateTime.UtcNow.AddDays(7)
@@ -382,6 +390,42 @@ namespace SignalRApp
         public async Task SendMessage(string userName, string message)
         {
             await Clients.All.SendAsync("Receive", userName, message);
+        }
+
+        public async Task<List<Session>> GetLoadSessions_DB(string email)
+        {
+            var currentUser = await context.Users
+                .FirstOrDefaultAsync(u => u.Email == email);
+
+            if (currentUser == null)
+                return new List<Session>();
+
+            int currentUserId = currentUser.IdUser;
+            //731e5fd7-b90c-4599-b8b1-a91796291243
+            var sessions = await context.Sessions
+                .Include(u => u.User)
+                .Where(u => u.UserId == currentUserId )
+                .ToListAsync();
+
+            return sessions;
+        }
+        public async Task<List<string>> GetInfo_IP_adress()
+        {
+            List<string> list = new List<string>();
+            string token = "58c696a42265bd";
+            
+            IPinfoClient client = new IPinfoClient.Builder()
+                .AccessToken(token)
+                .Build();
+            IPResponse ipResponse = await client.IPApi.GetDetailsAsync();
+
+            list.Add(ipResponse.IP);
+            list.Add(ipResponse.CountryName);
+            list.Add(ipResponse.City);
+            
+            //list.Add(ipResponse.CountryFlagURL);
+
+            return list;
         }
 
         #endregion
