@@ -4,11 +4,14 @@ using IPinfo.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using SignalRApp.ChatFolder;
 using SignalRApp.MessageFolder;
 using SignalRApp.Services;
 using SignalRApp.UserFolder;
 using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
 namespace SignalRApp
@@ -19,6 +22,7 @@ namespace SignalRApp
         public ChatHub(DataBaze context)
         {
             this.context = context;
+            
         }
         #region Поля и свойства
         private readonly DataBaze context;
@@ -265,7 +269,7 @@ namespace SignalRApp
                     CompanionID = m.Sender.IdUser,
                     CompanionName = m.Sender.NameUser,
                     CompanionPhoto = m.Sender.PhotoUser,
-                    MessageText = m.MessageText,
+                    MessageText = m.MessageText, 
                     DateSendMessage = m.DateSendMessage
                 })
                 .ToListAsync();
@@ -284,12 +288,37 @@ namespace SignalRApp
             return users;
         }
 
+
+        private static byte[] GetIV(string ivSecret)
+        {
+            using MD5 md5 = MD5.Create();
+            return md5.ComputeHash(Encoding.UTF8.GetBytes(ivSecret));
+        }
+        private static byte[] GetKey(string key)
+        {
+            using SHA256 sha256 = SHA256.Create();
+            return sha256.ComputeHash(Encoding.UTF8.GetBytes(key));
+        }
+
+        //private void AES()
+        //{
+        //    string key = "секретный ключ"; //ключ для шифрования
+        //    string ivSecret = "вектор"; //вектор инициализации
+
+        //    using Aes aes = Aes.Create();
+        //    aes.IV = GetIV(ivSecret);
+        //    aes.Key = GetKey(key);
+
+        //    CryptoStream encStream = new CryptoStream(outStream, aes.CreateEncryptor(aes.Key, aes.IV), CryptoStreamMode.Write);
+        //}
+
         public async Task<bool> SentMessageUser(int ChatId, int CompanionID,
             int IdUser, string Message, DateTime dateTime, string ConnectionId)
         {
 
             try
             {
+
                 var msg = new Message
                 {
                     ChatId = ChatId,
@@ -298,11 +327,9 @@ namespace SignalRApp
                     DateSendMessage = DateTime.Now
                 };
 
-                // Сохраняем сообщение в БД
                 context.Messages.Add(msg);
                 await context.SaveChangesAsync();
 
-                // Отправляем сообщение обоим участникам чата
                 var sender = await context.Users.FirstOrDefaultAsync(u => u.IdUser == IdUser);
                 var messageDto = new MessageChat
                 {
@@ -315,16 +342,13 @@ namespace SignalRApp
                     DateSendMessage = msg.DateSendMessage
                 };
 
-                // Находим получателя
                 var receiver = await context.Users.FirstOrDefaultAsync(u => u.IdUser == CompanionID);
 
-                // Отправляем получателю
                 if (!string.IsNullOrEmpty(receiver?.ConnectionId))
                 {
                     await Clients.Client(receiver.ConnectionId).SendAsync("ReceiveMessage", messageDto);
                 }
 
-                // Отправляем самому отправителю (для отображения своего сообщения)
                 if (!string.IsNullOrEmpty(sender?.ConnectionId))
                 {
                     await Clients.Client(sender.ConnectionId).SendAsync("ReceiveMessage", messageDto);
@@ -337,7 +361,6 @@ namespace SignalRApp
             }
             catch (Exception ex)
             {
-                // логируем ошибку
                 Console.WriteLine(ex);
                 return false;
             }
@@ -374,13 +397,11 @@ namespace SignalRApp
         {
             var session = await context.Sessions
                 .Include(s => s.User)
-                // Условия
                 .FirstOrDefaultAsync(s => s.RefreshToken == refreshToken  && s.ExpiresAt > DateTime.UtcNow);
 
             if (session == null)
                 return null;
 
-            // Обновляем ConnectionId
             session.User.ConnectionId = Context.ConnectionId;
 
             await context.SaveChangesAsync();
