@@ -31,6 +31,9 @@ namespace SignalRApp.UserFolder
         [Column("Nickname")]
         public string Nickname { get; set; }
 
+        [Column("Status")]
+        public int Status { get; set; }
+
         // Навигационные свойства
 
         // Чаты, где пользователь первый участник

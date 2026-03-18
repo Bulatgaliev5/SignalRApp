@@ -13,6 +13,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
+using static SignalRApp.UserFolder.Enums.UserEnums;
 
 namespace SignalRApp
 {
@@ -117,7 +118,6 @@ namespace SignalRApp
         }
         public async Task<List<ChatUser>> GetUserChats(string email)
         {
-            // Находим текущего пользователя
             var currentUser = await context.Users
                 .FirstOrDefaultAsync(u => u.Email == email);
 
@@ -136,9 +136,8 @@ namespace SignalRApp
 
             var chatList = chats.Select(c =>
             {
-                // Определяем собеседника
                 var companion = c.User1Id == currentUserId ? c.User2 : c.User1;
-                // Берем последнее сообщение в чате
+
                 var lastMessage = c.Messages
                     .OrderByDescending(m => m.DateSendMessage)
                     .FirstOrDefault();
@@ -150,7 +149,8 @@ namespace SignalRApp
                     CompanionPhoto = companion.PhotoUser,
                     CompanionID = companion.IdUser,
                     LastMessage = lastMessage?.MessageText,
-                    LastMessageDate = lastMessage?.DateSendMessage
+                    LastMessageDate = lastMessage?.DateSendMessage,
+                    CompanionStatus = (StatusUser)companion.Status
                 };
             })
             // Сортировка по дате последнего сообщения
@@ -162,7 +162,6 @@ namespace SignalRApp
 
         public async Task<ChatUser> GetUserChat(string email, int companionId)
         {
-            // Находим текущего пользователя
             var currentUser = await context.Users
                 .FirstOrDefaultAsync(u => u.Email == email);
 
@@ -425,6 +424,50 @@ namespace SignalRApp
             return list;
         }
 
+        public override async Task OnConnectedAsync()
+        {
+            var connectionId = Context.ConnectionId;
+
+            var receivers = await context.Chats
+                .Include(s => s.User2.ConnectionId == connectionId)
+                .ToListAsync();
+            //var receiver = await context.Users.FirstOrDefaultAsync(u => u.IdUser == CompanionID);
+
+            foreach (var receiver in receivers)
+            {
+                if (!string.IsNullOrEmpty(receiver?.User2.ConnectionId))
+                {
+                    await Clients.Client(receiver.User2.ConnectionId).SendAsync("UserStatus", StatusUser.Online); //в сети
+                }
+            }
+
+
+
+            //await Clients.All.SendAsync("UserStatusConnected", connectionId);
+
+            await base.OnConnectedAsync();
+        }
+
+        public override async Task OnDisconnectedAsync(Exception exception)
+        {
+            var connectionId = Context.ConnectionId;
+
+            var receivers = await context.Chats
+                .Include(s => s.User2.ConnectionId == connectionId)
+                .ToListAsync();
+            //var receiver = await context.Users.FirstOrDefaultAsync(u => u.IdUser == CompanionID);
+
+            foreach (var receiver in receivers)
+            {
+                if (!string.IsNullOrEmpty(receiver?.User2.ConnectionId))
+                {
+                    await Clients.Client(receiver.User2.ConnectionId).SendAsync("UserStatus", StatusUser.Offline); //не в сети
+                }
+            }
+            //await Clients.All.SendAsync("UserStatusConnected", connectionId);
+
+            await base.OnDisconnectedAsync(exception);
+        }
         #endregion
 
 

@@ -1,4 +1,6 @@
-﻿namespace SignalRApp.ChatFolder
+﻿using static SignalRApp.UserFolder.Enums.UserEnums;
+
+namespace SignalRApp.ChatFolder
 {
     public class ChatUser
     {
@@ -8,5 +10,6 @@
         public string CompanionPhoto { get; set; }
         public string LastMessage { get; set; }
         public DateTime? LastMessageDate { get; set; }
+        public StatusUser? CompanionStatus { get; set; }
     }
 }
