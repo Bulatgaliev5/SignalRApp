@@ -23,10 +23,11 @@ namespace SignalRApp
         public ChatHub(DataBaze context)
         {
             this.context = context;
-            
+
         }
         #region Поля и свойства
         private readonly DataBaze context;
+        private User User;
         #endregion
         #region Методы
 
@@ -44,7 +45,7 @@ namespace SignalRApp
                 // Ищем пользователя в БД
                 var user = await context.Users
                     .FirstOrDefaultAsync(u => u.Email == email);
-
+                User = user;
                 // Сохраняем ConnectionId
                 user.ConnectionId = Context.ConnectionId;
                 await context.SaveChangesAsync();
@@ -204,7 +205,7 @@ namespace SignalRApp
             var lastMessage = chat.Messages
                 .OrderByDescending(m => m.DateSendMessage)
                 .FirstOrDefault();
-            if (chat.Messages.Count==0)
+            if (chat.Messages.Count == 0)
             {
                 lastMessage = new Message
                 {
@@ -268,7 +269,7 @@ namespace SignalRApp
                     CompanionID = m.Sender.IdUser,
                     CompanionName = m.Sender.NameUser,
                     CompanionPhoto = m.Sender.PhotoUser,
-                    MessageText = m.MessageText, 
+                    MessageText = m.MessageText,
                     DateSendMessage = m.DateSendMessage
                 })
                 .ToListAsync();
@@ -347,7 +348,7 @@ namespace SignalRApp
             var infoIP = GetInfo_IP_adress().Result;
             var newSession = new Session
             {
-               // SessionId = Guid.NewGuid().ToString(),
+                // SessionId = Guid.NewGuid().ToString(),
                 UserId = user.IdUser,
                 RefreshToken = Guid.NewGuid().ToString(),
                 OS = os,
@@ -356,6 +357,7 @@ namespace SignalRApp
                 IP_adress = infoIP[0].ToString(),
                 IP_adress_country = infoIP[1].ToString(),
                 IP_adress_city = infoIP[2].ToString(),
+                IP_adress_CountryFlagURL = infoIP[3].ToString(),
                 CreatedAt = DateTime.UtcNow,
                 // 7 дней действует сессия
                 ExpiresAt = DateTime.UtcNow.AddDays(7)
@@ -367,12 +369,12 @@ namespace SignalRApp
             return newSession;
         }
         //Метод повторной авторизации, когда есть сессия
-        
+
         public async Task<User> AuthorizeByRefresh(string refreshToken)
         {
             var session = await context.Sessions
                 .Include(s => s.User)
-                .FirstOrDefaultAsync(s => s.RefreshToken == refreshToken  && s.ExpiresAt > DateTime.UtcNow);
+                .FirstOrDefaultAsync(s => s.RefreshToken == refreshToken && s.ExpiresAt > DateTime.UtcNow);
 
             if (session == null)
                 return null;
@@ -400,7 +402,7 @@ namespace SignalRApp
             //731e5fd7-b90c-4599-b8b1-a91796291243
             var sessions = await context.Sessions
                 .Include(u => u.User)
-                .Where(u => u.UserId == currentUserId )
+                .Where(u => u.UserId == currentUserId)
                 .ToListAsync();
 
             return sessions;
@@ -409,7 +411,7 @@ namespace SignalRApp
         {
             List<string> list = new List<string>();
             string token = "58c696a42265bd";
-            
+
             IPinfoClient client = new IPinfoClient.Builder()
                 .AccessToken(token)
                 .Build();
@@ -418,56 +420,96 @@ namespace SignalRApp
             list.Add(ipResponse.IP);
             list.Add(ipResponse.CountryName);
             list.Add(ipResponse.City);
-            
+            list.Add(ipResponse.CountryFlagURL);
+
             //list.Add(ipResponse.CountryFlagURL);
 
             return list;
         }
 
-        public override async Task OnConnectedAsync()
-        {
-            var connectionId = Context.ConnectionId;
+        //public override async Task OnConnectedAsync()
+        //{
+        //    var connectionId = Context.ConnectionId;
 
-            var receivers = await context.Chats
-                .Include(s => s.User2.ConnectionId == connectionId)
-                .ToListAsync();
-            //var receiver = await context.Users.FirstOrDefaultAsync(u => u.IdUser == CompanionID);
+        //    var receiver = await context.Users.FirstOrDefaultAsync(u => u.ConnectionId == User.ConnectionId);
 
-            foreach (var receiver in receivers)
-            {
-                if (!string.IsNullOrEmpty(receiver?.User2.ConnectionId))
-                {
-                    await Clients.Client(receiver.User2.ConnectionId).SendAsync("UserStatus", StatusUser.Online); //в сети
-                }
-            }
+        //    if (receiver != null)
+        //         await Clients.Client(receiver.ConnectionId).SendAsync("UserStatus", StatusUser.Online); //в сети
+            
 
 
+        //    //await Clients.All.SendAsync("UserStatusConnected", connectionId);
 
-            //await Clients.All.SendAsync("UserStatusConnected", connectionId);
+        //    await base.OnConnectedAsync();
+        //}
 
-            await base.OnConnectedAsync();
-        }
+        //public override async Task OnDisconnectedAsync(Exception exception)
+        //{
+        //    var connectionId = Context.ConnectionId;
 
-        public override async Task OnDisconnectedAsync(Exception exception)
-        {
-            var connectionId = Context.ConnectionId;
+        //    var receiver = await context.Users.FirstOrDefaultAsync(u => u.ConnectionId == User.ConnectionId);
 
-            var receivers = await context.Chats
-                .Include(s => s.User2.ConnectionId == connectionId)
-                .ToListAsync();
-            //var receiver = await context.Users.FirstOrDefaultAsync(u => u.IdUser == CompanionID);
 
-            foreach (var receiver in receivers)
-            {
-                if (!string.IsNullOrEmpty(receiver?.User2.ConnectionId))
-                {
-                    await Clients.Client(receiver.User2.ConnectionId).SendAsync("UserStatus", StatusUser.Offline); //не в сети
-                }
-            }
-            //await Clients.All.SendAsync("UserStatusConnected", connectionId);
+        //    if (receiver != null)
+        //        await Clients.Client(receiver.ConnectionId).SendAsync("UserStatus", StatusUser.Offline); //не в сети
 
-            await base.OnDisconnectedAsync(exception);
-        }
+        //    //await Clients.All.SendAsync("UserDisconnected", connectionId);
+
+        //    await base.OnDisconnectedAsync(exception);
+        //}
+
+
+        //public override async Task OnConnectedAsync()
+        //{
+        //    var connectionId = Context.ConnectionId;
+
+        //    //if (Context.ConnectionAborted.IsCancellationRequested)
+        //    {
+        //        var receivers = await context.Chats
+        //            .Include(s => s.User2.ConnectionId == connectionId)
+        //            .ToListAsync();
+        //        //var receiver = await context.Users.FirstOrDefaultAsync(u => u.IdUser == CompanionID);
+
+        //        foreach (var receiver in receivers)
+        //        {
+        //            if (!string.IsNullOrEmpty(receiver?.User2.ConnectionId))
+        //            {
+        //                await Clients.Client(receiver.User2.ConnectionId).SendAsync("UserStatus", StatusUser.Online); //в сети
+        //            }
+        //        }
+        //    }
+
+
+
+
+
+        //    //await Clients.All.SendAsync("UserStatusConnected", connectionId);
+
+        //    await base.OnConnectedAsync();
+        //}
+
+        //public override async Task OnDisconnectedAsync(Exception exception)
+        //{
+        //    var connectionId = Context.ConnectionId;
+
+        //    //if (!Context.ConnectionAborted.IsCancellationRequested)
+        //    {
+        //        var receivers = await context.Chats
+        //        .Include(s => s.User2.ConnectionId == connectionId)
+        //        .ToListAsync();
+        //        //var receiver = await context.Users.FirstOrDefaultAsync(u => u.IdUser == CompanionID);
+
+        //        foreach (var receiver in receivers)
+        //        {
+        //            if (!string.IsNullOrEmpty(receiver?.User2.ConnectionId))
+        //            {
+        //                await Clients.Client(receiver.User2.ConnectionId).SendAsync("UserStatus", StatusUser.Offline); //не в сети
+        //            }
+        //        }
+        //        //await Clients.All.SendAsync("UserStatusConnected", connectionId);
+        //    }
+        //    await base.OnDisconnectedAsync(exception);
+        //}
         #endregion
 
 
