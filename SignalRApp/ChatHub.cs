@@ -360,7 +360,7 @@ namespace SignalRApp
                 IP_adress_CountryFlagURL = infoIP[3].ToString(),
                 CreatedAt = DateTime.UtcNow,
                 // 7 дней действует сессия
-                ExpiresAt = DateTime.UtcNow.AddDays(7)
+                ExpiresAt = DateTime.UtcNow.AddDays(7) //Не влияет ни на что 
             };
 
             context.Sessions.Add(newSession);
@@ -374,7 +374,8 @@ namespace SignalRApp
         {
             var session = await context.Sessions
                 .Include(s => s.User)
-                .FirstOrDefaultAsync(s => s.RefreshToken == refreshToken && s.ExpiresAt > DateTime.UtcNow);
+                //.FirstOrDefaultAsync(s => s.RefreshToken == refreshToken && s.ExpiresAt > DateTime.UtcNow);
+                .FirstOrDefaultAsync(s => s.RefreshToken == refreshToken);
 
             if (session == null)
                 return null;
