@@ -17,6 +17,7 @@ namespace SignalRApp.UserFolder
         public string IP_adress { get; set; }
         public string IP_adress_city { get; set; }
         public string IP_adress_country { get; set; }
+        public string IP_adress_CountryFlagURL { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime ExpiresAt { get; set; }
 
