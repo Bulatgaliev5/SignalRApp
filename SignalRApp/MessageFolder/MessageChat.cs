@@ -8,6 +8,7 @@ namespace SignalRApp.MessageFolder
         public int ID { get; set; }
         public int ChatId { get; set; }
         public int CompanionID { get; set; }
+        public int SenderID { get; set; }
 
         public string CompanionName { get; set; } 
         public string CompanionPhoto { get; set; }

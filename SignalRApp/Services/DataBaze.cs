@@ -2,6 +2,7 @@
 using SignalRApp.ChatFolder;
 using SignalRApp.MessageFolder;
 using SignalRApp.UserFolder;
+using SignalRApp.UserFolder.Enums;
 using System;
 
 namespace SignalRApp.Services

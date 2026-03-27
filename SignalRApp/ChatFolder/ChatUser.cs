@@ -11,5 +11,6 @@ namespace SignalRApp.ChatFolder
         public string LastMessage { get; set; }
         public DateTime? LastMessageDate { get; set; }
         public StatusUser? CompanionStatus { get; set; }
+        public string? CompanionPublicKey { get; set; }
     }
 }

@@ -33,6 +33,8 @@ namespace SignalRApp.UserFolder
 
         [Column("Status")]
         public int Status { get; set; }
+        [Column("PublicKey")]
+        public string PublicKey { get; set; }
 
         // Навигационные свойства
 

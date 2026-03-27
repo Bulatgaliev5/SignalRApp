@@ -88,7 +88,8 @@ namespace SignalRApp
                         PhotoUser = user1.PhotoUser,
                         Nickname = email.Split('@')[0],
                         NameUser = user1.NameUser,
-                        ConnectionId = Context.ConnectionId
+                        ConnectionId = Context.ConnectionId,
+                        PublicKey = user1.PublicKey,
                     };
 
                     context.Users.Add(user);
@@ -107,6 +108,8 @@ namespace SignalRApp
                 return null;
             }
         }
+
+
         public async Task SaveConnectionId(int userId)
         {
             var user = await context.Users.FirstOrDefaultAsync(u => u.IdUser == userId);
@@ -138,6 +141,7 @@ namespace SignalRApp
             var chatList = chats.Select(c =>
             {
                 var companion = c.User1Id == currentUserId ? c.User2 : c.User1;
+                var sender = c.User1Id != currentUserId ? c.User2 : c.User1;
 
                 var lastMessage = c.Messages
                     .OrderByDescending(m => m.DateSendMessage)
@@ -151,7 +155,8 @@ namespace SignalRApp
                     CompanionID = companion.IdUser,
                     LastMessage = lastMessage?.MessageText,
                     LastMessageDate = lastMessage?.DateSendMessage,
-                    CompanionStatus = (StatusUser)companion.Status
+                    CompanionStatus = (StatusUser)companion.Status,
+                    CompanionPublicKey = companion.PublicKey,
                 };
             })
             // Сортировка по дате последнего сообщения
@@ -207,11 +212,14 @@ namespace SignalRApp
                 .FirstOrDefault();
             if (chat.Messages.Count == 0)
             {
+                EncryptionService encryptionService = new EncryptionService(currentUserId.ToString(), chat.Id.ToString());
+                var messageHello = encryptionService.Encrypt("Привет!");
+
                 lastMessage = new Message
                 {
                     ChatId = chat.Id,
                     SenderId = currentUserId,
-                    MessageText = "Привет!",
+                    MessageText = messageHello,
                     DateSendMessage = DateTime.Now,
                 };
 
@@ -259,8 +267,8 @@ namespace SignalRApp
         {
             var messages = await context.Messages
                 .Include(m => m.Sender)
-                .Include(m => m.Chat)
-                .Where(m => m.ChatId == ChatId)
+                .Include(c => c.Chat)
+                .Where(c => c.ChatId == ChatId)
                 .OrderBy(m => m.DateSendMessage)
                 .Select(m => new MessageChat
                 {
@@ -428,6 +436,28 @@ namespace SignalRApp
             return list;
         }
 
+
+        public async Task<bool> RemoveSessionUser_DB(string RefreshToken)
+        {
+            //var currentUser = await context.Users
+            //    .FirstOrDefaultAsync(u => u.Email == email);
+
+            //if (currentUser == null)
+            //    return new List<Session>();
+
+            //int currentUserId = currentUser.IdUser;
+            //731e5fd7-b90c-4599-b8b1-a91796291243
+            var session = await context.Sessions
+                //.Include(u => u.User)
+                .Where(u => u.RefreshToken == RefreshToken)
+                .FirstOrDefaultAsync();
+
+            if (session is null)
+                return false;
+            return true;
+
+        }
+
         //public override async Task OnConnectedAsync()
         //{
         //    var connectionId = Context.ConnectionId;
@@ -436,7 +466,7 @@ namespace SignalRApp
 
         //    if (receiver != null)
         //         await Clients.Client(receiver.ConnectionId).SendAsync("UserStatus", StatusUser.Online); //в сети
-            
+
 
 
         //    //await Clients.All.SendAsync("UserStatusConnected", connectionId);
