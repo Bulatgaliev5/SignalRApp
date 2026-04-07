@@ -166,7 +166,7 @@ namespace SignalRApp
             return chatList;
         }
 
-        public async Task<ChatUser> GetUserChat(string email, int companionId)
+        public async Task<ChatUser> GetUserChat(string email, int companionId, string publicKey)
         {
             var currentUser = await context.Users
                 .FirstOrDefaultAsync(u => u.Email == email);
@@ -210,10 +210,11 @@ namespace SignalRApp
             var lastMessage = chat.Messages
                 .OrderByDescending(m => m.DateSendMessage)
                 .FirstOrDefault();
-            if (chat.Messages.Count == 0)
+            if (chat.Messages.Count == 0)   
             {
-                EncryptionService encryptionService = new EncryptionService(currentUserId.ToString(), chat.Id.ToString());
-                var messageHello = encryptionService.Encrypt("Привет!");
+                SimpleRSA rsa = new SimpleRSA();
+                rsa.LoadOrGenerateKeys(publicKey, publicKey); //Надо подумать
+                var messageHello = rsa.Encrypt("Hello");
 
                 lastMessage = new Message
                 {
@@ -239,7 +240,8 @@ namespace SignalRApp
                 CompanionPhoto = companion.PhotoUser,
                 CompanionID = companion.IdUser,
                 LastMessage = lastMessage?.MessageText,
-                LastMessageDate = lastMessage?.DateSendMessage
+                LastMessageDate = lastMessage?.DateSendMessage,
+                CompanionStatus = (StatusUser)companion.Status
             };
             //if (!string.IsNullOrEmpty(receiver?.ConnectionId))
             //{
