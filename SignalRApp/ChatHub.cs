@@ -166,7 +166,7 @@ namespace SignalRApp
             return chatList;
         }
 
-        public async Task<ChatUser> GetUserChat(string email, int companionId, string publicKey)
+        public async Task<ChatUser> GetUserChat(string email, int companionId)
         {
             var currentUser = await context.Users
                 .FirstOrDefaultAsync(u => u.Email == email);
@@ -213,14 +213,15 @@ namespace SignalRApp
             if (chat.Messages.Count == 0)   
             {
                 SimpleRSA rsa = new SimpleRSA();
-                rsa.LoadOrGenerateKeys(publicKey, publicKey); //Надо подумать
-                var messageHello = rsa.Encrypt("Hello");
+
+                //rsa.LoadOrGenerateKeys(publicKey, publicKey); //Надо подумать
+                //var messageHello = rsa.Encrypt("Hello");
 
                 lastMessage = new Message
                 {
                     ChatId = chat.Id,
                     SenderId = currentUserId,
-                    MessageText = messageHello,
+                    MessageText = "",
                     DateSendMessage = DateTime.Now,
                 };
 

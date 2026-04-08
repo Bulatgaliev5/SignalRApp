@@ -14,6 +14,8 @@ namespace SignalRApp
             var builder = WebApplication.CreateBuilder(args);
             builder.Services.AddSignalR();
 
+            builder.Services.AddControllers(); // <-- ÄÎÁÀÂÈÒÜ ÝÒÎ
+
             // Èíèöèàëèçàöèÿ Firebase
             FirebaseApp.Create(new AppOptions()
             {
@@ -38,6 +40,9 @@ namespace SignalRApp
             });
 
             var app = builder.Build();
+            app.UseStaticFiles();
+
+            app.MapControllers(); // <-- ÄÎÁÀÂÈÒÜ ÝÒÎ
 
             app.MapHub<ChatHub>("/chat");
             app.Run();
