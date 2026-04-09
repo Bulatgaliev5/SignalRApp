@@ -138,7 +138,7 @@ namespace SignalRApp
                 .Where(c => c.User1Id == currentUserId || c.User2Id == currentUserId)
                 .ToListAsync();
 
-            var chatList = chats.Select(c =>
+            var chatTasks = chats.Select(async c =>
             {
                 var companion = c.User1Id == currentUserId ? c.User2 : c.User1;
                 var sender = c.User1Id != currentUserId ? c.User2 : c.User1;
@@ -147,21 +147,54 @@ namespace SignalRApp
                     .OrderByDescending(m => m.DateSendMessage)
                     .FirstOrDefault();
 
-                return new ChatUser
+
+                if (lastMessage.MessageType == MessageTypeEnum.Text)
                 {
-                    ChatId = c.Id,
-                    CompanionName = companion.NameUser,
-                    CompanionPhoto = companion.PhotoUser,
-                    CompanionID = companion.IdUser,
-                    LastMessage = lastMessage?.MessageText,
-                    LastMessageDate = lastMessage?.DateSendMessage,
-                    CompanionStatus = (StatusUser)companion.Status,
-                    CompanionPublicKey = companion.PublicKey,
-                };
-            })
+                    return new ChatUser
+                    {
+                        ChatId = c.Id,
+                        CompanionName = companion.NameUser,
+                        CompanionPhoto = companion.PhotoUser,
+                        CompanionID = companion.IdUser,
+                        LastMessage = lastMessage?.MessageText,
+                        LastMessageDate = lastMessage?.DateSendMessage,
+                        CompanionStatus = (StatusUser)companion.Status,
+                        CompanionPublicKey = companion.PublicKey,
+                        MessageType = lastMessage.MessageType
+                    };
+                }
+                //else if (lastMessage.MessageType == MessageTypeEnum.File)
+                //{
+                    var files = await context.MessageFiles
+                        .Where(m => m.MessageId == lastMessage.ID)
+                        .ToListAsync();
+
+                    return new ChatUser
+                    {
+                        ChatId = c.Id,
+                        CompanionName = companion.NameUser,
+                        CompanionPhoto = companion.PhotoUser,
+                        CompanionID = companion.IdUser,
+                        LastMessage = lastMessage?.MessageText,
+                        LastMessageDate = lastMessage?.DateSendMessage,
+                        CompanionStatus = (StatusUser)companion.Status,
+                        CompanionPublicKey = companion.PublicKey,
+                        MessageType = lastMessage.MessageType,
+                        MessageFiles = files.Select(f => new FileDto
+                        {
+                            FileURL = f.FileURL,
+                            FileName = f.FileName,
+                            TypeFile = f.TypeFile.ToString()
+                        }).ToList()
+                    };
+                // }
+
+
+            });
             // Сортировка по дате последнего сообщения
-            .OrderByDescending(c => c.LastMessageDate)
-            .ToList();
+                var chatList = (await Task.WhenAll(chatTasks))
+                .OrderByDescending(c => c.LastMessageDate)
+                .ToList();
 
             return chatList;
         }
@@ -268,9 +301,9 @@ namespace SignalRApp
 
         public async Task<List<MessageChat>> GetSelectedChatUser(int ChatId)
         {
-            var messages = await context.Messages
+            var message =  await context.Messages
                 .Include(m => m.Sender)
-                .Include(c => c.Chat)
+                .Include(m => m.MessageFiles) 
                 .Where(c => c.ChatId == ChatId)
                 .OrderBy(m => m.DateSendMessage)
                 .Select(m => new MessageChat
@@ -281,11 +314,18 @@ namespace SignalRApp
                     CompanionName = m.Sender.NameUser,
                     CompanionPhoto = m.Sender.PhotoUser,
                     MessageText = m.MessageText,
-                    DateSendMessage = m.DateSendMessage
+                    DateSendMessage = m.DateSendMessage,
+                    MessageType = m.MessageType,
+                    MessageFiles = m.MessageFiles.Select(f => new FileDto
+                    {   
+                        FileURL = f.FileURL,
+                        FileName = f.FileName,
+                        TypeFile = f.TypeFile.ToString() 
+                    }).ToList()
                 })
                 .ToListAsync();
 
-            return messages;
+            return message;
         }
 
         public async Task<List<User>> SearchUserServer(string nickname, User user)
@@ -339,6 +379,77 @@ namespace SignalRApp
                 if (!string.IsNullOrEmpty(sender?.ConnectionId))
                 {
                     await Clients.Client(sender.ConnectionId).SendAsync("ReceiveMessage", messageDto);
+                }
+
+                return true;
+
+
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+                return false;
+            }
+        }
+        public async Task<bool> SendImageMessageUser_DB(int ChatId, int CompanionID,
+            int IdUser, string Message, DateTime dateTime, string ConnectionId, string fileUrl, string fileName)
+        {
+
+            try
+            {
+
+                var msg = new Message
+                {
+                    ChatId = ChatId,
+                    SenderId = IdUser,
+                    MessageText = Message,
+                    DateSendMessage = DateTime.Now,
+                    MessageType = MessageTypeEnum.File
+                };
+
+                context.Messages.Add(msg);
+                await context.SaveChangesAsync();
+
+                var sender = await context.Users.FirstOrDefaultAsync(u => u.IdUser == IdUser);
+                var messageDto = new MessageChat
+                {
+                    ID = msg.ID,
+                    ChatId = msg.ChatId,
+                    CompanionID = msg.SenderId,
+                    CompanionName = sender?.NameUser ?? "",
+                    CompanionPhoto = sender?.PhotoUser ?? "",
+                    MessageText = msg.MessageText,
+                    DateSendMessage = msg.DateSendMessage,
+                    MessageType = MessageTypeEnum.File
+                };
+
+                var fileImage = new MessageFiles 
+                { 
+                    FileName = fileName,
+                    FileURL = fileUrl,
+                    TypeFile = TypeFileEnum.Image,
+                    MessageId = messageDto.ID
+                };
+                context.MessageFiles.Add(fileImage);
+                await context.SaveChangesAsync();
+
+
+                var message = await context.Messages
+                    .Include(f => f.MessageFiles)
+                    .FirstOrDefaultAsync(m => m.ID == messageDto.ID);
+
+
+                var receiver = await context.Users.FirstOrDefaultAsync(u => u.IdUser == CompanionID);
+
+                if (!string.IsNullOrEmpty(receiver?.ConnectionId))
+                {
+                    await Clients.Client(receiver.ConnectionId).SendAsync("ReceiveMessage", message);
+                }
+
+                if (!string.IsNullOrEmpty(sender?.ConnectionId))
+                {
+                    await Clients.Client(sender.ConnectionId).SendAsync("ReceiveMessage", message);
                 }
 
                 return true;

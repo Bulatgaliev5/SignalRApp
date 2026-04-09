@@ -24,12 +24,21 @@ namespace SignalRApp.MessageFolder
 
         [Column("DateSendMessage")]
         public DateTime DateSendMessage { get; set; }
+        [Column("MessageType")]
+        public MessageTypeEnum MessageType { get; set; }
 
         // Навигационное свойство
         [ForeignKey("ChatId")]
         public Chat Chat { get; set; }
         [ForeignKey("SenderId")]
         public User Sender { get; set; }
+        public List<MessageFiles> MessageFiles { get; set; } = new();
 
+    }
+
+    public enum MessageTypeEnum
+    {
+        Text,
+        File
     }
 }

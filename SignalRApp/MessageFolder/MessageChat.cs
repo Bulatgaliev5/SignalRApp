@@ -15,5 +15,7 @@ namespace SignalRApp.MessageFolder
 
         public string MessageText { get; set; }
         public DateTime DateSendMessage { get; set; }
+        public MessageTypeEnum MessageType { get; set; }
+        public List<FileDto> MessageFiles { get; set; } = new (); 
     }
 }

@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using SignalRApp.MessageFolder;
 using SignalRApp.Services;
 using System.IO;
 using System.Linq;
@@ -55,6 +56,49 @@ namespace SignalRApp
                 await context.SaveChangesAsync();
             }
         }
+
+
+
+
+        [HttpPost("Chat_{id}")]
+        public async Task<IActionResult> AddPhotoChat(string id, IFormFile file)
+        {
+            string storagePath = Path.Combine(Directory.GetCurrentDirectory(), $"wwwroot/Chat_{id}");
+
+            if (!Directory.Exists(storagePath))
+                Directory.CreateDirectory(storagePath);
+
+            if (file == null || file.Length == 0)
+                return BadRequest();
+
+            var FileName = Guid.NewGuid() + Path.GetExtension(file.FileName);
+            var filePath = Path.Combine(storagePath, FileName);
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            var FileURL = $"/Chat_{id}/{FileName}";
+            //await AddPhotoChat_DB(id, );
+            return Ok(new FileDto { FileURL = FileURL, FileName = FileName });
+        }
+
+        //private async Task AddPhotoChat_DB(string url, string Nickname)
+        //{
+        //    ChatHub chatHub = new ChatHub(context);
+        //    chatHub.SendImageMessageUser()
+        //    var user = await context.Users
+        //        .FirstOrDefaultAsync(u => u.Nickname == Nickname);
+
+        //    if (user != null)
+        //    {
+        //        user.PhotoUser = url;
+        //        await context.SaveChangesAsync();
+        //    }
+        //}
+
+
     }
 
 
