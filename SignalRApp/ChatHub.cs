@@ -435,21 +435,27 @@ namespace SignalRApp
                 await context.SaveChangesAsync();
 
 
-                var message = await context.Messages
-                    .Include(f => f.MessageFiles)
-                    .FirstOrDefaultAsync(m => m.ID == messageDto.ID);
+                //var message = await context.Messages
+                //    .Include(f => f.MessageFiles)
+                //    .FirstOrDefaultAsync(m => m.ID == messageDto.ID);
 
+                messageDto.MessageFiles.Add(new FileDto
+                {
+                    FileName = fileImage.FileName,
+                    FileURL = fileImage.FileURL,
+                    TypeFile = fileImage.TypeFile.ToString(),
+                });
 
                 var receiver = await context.Users.FirstOrDefaultAsync(u => u.IdUser == CompanionID);
 
                 if (!string.IsNullOrEmpty(receiver?.ConnectionId))
                 {
-                    await Clients.Client(receiver.ConnectionId).SendAsync("ReceiveMessage", message);
+                    await Clients.Client(receiver.ConnectionId).SendAsync("ReceiveMessage", messageDto);
                 }
 
                 if (!string.IsNullOrEmpty(sender?.ConnectionId))
                 {
-                    await Clients.Client(sender.ConnectionId).SendAsync("ReceiveMessage", message);
+                    await Clients.Client(sender.ConnectionId).SendAsync("ReceiveMessage", messageDto);
                 }
 
                 return true;
